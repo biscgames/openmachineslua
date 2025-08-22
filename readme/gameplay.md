@@ -20,3 +20,25 @@ Your machines should look something like this
 - Section Test mod
 
 <br/><br/>
+## Machines
+- Switch
+- - Activates machines like extractors, etc.
+- - Off by default
+- - Right-click to toggle them On or Off
+- Extractor
+- - Extracts items from the deposit above then puts the items in the storage to its right
+- Advanced Extractor
+- - Extracts items from the deposit above, deposit below or both. Then puts the items in the storage to its right
+- Simple Storage
+- - Recieves items from the extractor to its left
+- - Can only hold 1 item
+- Storage
+- - Recieves items from the extractor to its left
+- - Can hold 3 items
+## Deposits
+- Normal. Drops:
+- - Iron
+- - Gold
+- - Etherium
+- Bone Deposit. Drops:
+- - Bone
