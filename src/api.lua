@@ -44,13 +44,16 @@ function api.inv_system:add_item(item_definition)
 		}
 	end
 	if existing then
+		if #self.items >= self.stack_limit then return end
 		local delta = self.items[i].stack + item_definition.stack
+		if delta > self.stack_limit then
+			if #self.items+1 >= self.stack_limit then return end
+			_add_item(delta-self.stack_limit)
+		end
 		self.items[i].stack = math.min(self.stack_limit,
 			delta
 		)
-		if delta > self.stack_limit then
-			_add_item(delta-self.stack_limit)
-		end
+
 	else
 		_add_item()
 	end
