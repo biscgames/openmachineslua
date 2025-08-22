@@ -1,6 +1,7 @@
 api = {}
 local registered_deposits = {}
 local registered_machines = {}
+local registered_sections = {}
 
 api.inv_system = {
 	items = {},
@@ -110,11 +111,80 @@ end
 			end
 		end, -- this is run every time the 5 second timer turns to 0 which is how the game progresses (for machine type, you must have pwr_on set to true)
 	}
+
+	You should make the id name something like "modname:my_cool_machine". That naming convention isn't required but try your best to make a name that
+	doesn't conflict with other mods if installed
 ]]
 function api.register_machine(machine_id,definition)
 	registered_machines[machine_id] = definition 
 end
+--[[
+	api.register_deposit(id,definition) registers deposits. These deposits hold items an extractor from below (or above) can extract for
+	{
+		type = "deposit", -- don't bother, it'll always be deposit no matter what type you enter
+		name = "Insane Deposit", -- should describe what is different from other deposits in a title
+		img_m = "deposit.png", -- get image, very cool
+		items_table = {} -- should be an iterable of item tables, hardcoding items is not recommended. put it in a variable
+		-- or like an iterable, call it mymod_items or whatever you wanna name it
+	}
+]]
 function api.register_deposit(deposit_id,definition)
 	definition.type = "deposit"
 	registered_deposits[deposit_id] = definition
+end
+
+--[[
+	api.register_section(section_name) registers sections player can go to using one of the buttons on the toolbar. 
+	The section_name is also responsible for grabbing the icon. If the icon doesn't exist anywhere in the "icons/" directory,
+	it'll show a question mark instead called "nil.png". Since you can't like, import your own images without mutating the original directory
+	goodluck with finding which one's which!
+]]
+function api.register_section(section_name)
+	registered_sections[#registered_sections+1]= section_name
+end
+
+--[[
+	api.dpcopy(table) isn't necessarily related to the game, but can be handy for certain situations, whenever you want to clone a table. No shallow, deep,
+]]
+function api.dpcopy(t)
+	-- Recursive cloning is happening here
+	if type(t)~="table"then return t end
+	local clone={}
+	for k,v in pairs(t)do clone[k]=api.dpcopy(v)end
+	return clone
+end
+
+--[[
+	api.place("machine"|"deposit",grid,machine_id,rc_table,c) places a machine! if rc_table is a number, it'll be passed as the row, requiring fifth argument, which will be passed as column
+	rc_table has the key "r" for row (or y axis) and "c" or column (or x axis)
+
+	grid is usually passed as an argument from your "init(grid,api)" function.
+	make sure grid[r][c] is 'e"' or you will replace something!
+]]
+function api.place_machine(type_,grid,machine_id,rc_table,c)
+	assert(type_=="machine"or type_=="deposit",
+		"First argument must be a string with value \"machine\" or \"deposit\""
+	)
+	local r
+	if type(rc_table)=="table" then
+		r = rc_table.r or 0
+		c = rc_table.c or 0
+	else
+		assert(type(rc_table)=="number",
+			"4th argument must be a table or number"
+		)
+		assert(c,
+			"5th argument must be passed"
+		)
+		r = rc_table
+		c = c
+	end
+	local t
+	if type_=="machine" then
+		t = api.dpcopy(registered_machines[machine_id])
+	else
+		t = api.dpcopy(registered_deposits[machine_id])
+	end
+	grid[r][c] = t
+
 end
