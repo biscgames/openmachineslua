@@ -4,7 +4,7 @@
 local soundq = {}
 local queue = {}
 soundq.pushqueue = function(source)
-	assert(type(source)~="table", "SoundQ only adds source values to the queue.")
+	assert(type(source)=="userdata", "SoundQ only adds source values to the queue.")
 	queue[#queue+1]= source:clone()
 end
 soundq.playqueue = function()

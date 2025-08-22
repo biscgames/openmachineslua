@@ -2,13 +2,14 @@ api = {}
 local registered_deposits = {}
 local registered_machines = {}
 local registered_sections = {}
+api.sections = {}
+api.shop_machines = {}
 
 api.inv_system = {
 	items = {},
 	stack_limit = 128,
 	can_fit = 9
 }
-
 --[[
 
 	the inventory:find(proc) method is used to find an item
@@ -30,14 +31,11 @@ end
 ]]
 function api.inv_system:add_item(item_definition)
 	local i,existing = self:find(function(item)
-		item.name==item_definition.name and item.stack<self.stack_limit 
+		return item.name==item_definition.name and item.stack<self.stack_limit 
 	end)
 	local function _add_item(stack)
 		stack = stack or item_definition.stack
-		local clone_attributes = {}
-		for k,v in pairs(item_definition.attributes or {}) do
-			if type(v) ~= "table" then clone_attributes[k] = v end
-		end
+		local clone_attributes = api.dpcopy(item_definition.attributes)
 		self.items[#self.items+1]= {
 			name = item_definition.name,
 			stack = stack,
@@ -67,7 +65,7 @@ function api.inv_system:remove_item(idx)
 		("Expected a number for idx removing or a string for removing by name, not \"%s\""):format(type(idx))
 	)
 	if type(idx) == "string" then
-		i,existing = self:find(function(item) item.name == idx end)
+		local i,existing = self:find(function(item) return item.name == idx end)
 		if existing then
 			table.remove(self.items,i)
 		end
@@ -83,7 +81,7 @@ end
 function api.inv_system:new(table)
 	return setmetatable(
 		table or {items={},stack_limit=128,can_fit=9},
-		self
+		{__index=self}
 	)
 end
 
@@ -151,7 +149,7 @@ function api.dpcopy(t)
 	if type(t)~="table"then return t end
 	local clone={}
 	for k,v in pairs(t)do clone[k]=api.dpcopy(v)end
-	return clone
+	return setmetatable(clone,getmetatable(t))
 end
 
 --[[
@@ -161,7 +159,7 @@ end
 	grid is usually passed as an argument from your "init(grid,api)" function.
 	make sure grid[r][c] is 'e"' or you will replace something!
 ]]
-function api.place_machine(type_,grid,machine_id,rc_table,c)
+function api.place(type_,grid,machine_id,rc_table,c)
 	assert(type_=="machine"or type_=="deposit",
 		"First argument must be a string with value \"machine\" or \"deposit\""
 	)
@@ -187,4 +185,38 @@ function api.place_machine(type_,grid,machine_id,rc_table,c)
 	end
 	grid[r][c] = t
 
+end
+
+function api.get_registered(type_)
+	assert(type_=="machine"or type_=="deposit",
+		"First argument must be a string with value \"machine\" or \"deposit\""
+	)
+	if type_=="machine" then
+		return registered_machines
+	else
+		return registered_deposits
+	end
+end
+function api.get_registered_sections()
+	return registered_sections
+end
+function api.add_section_table_for(name)
+	function test()
+		for _,sname in ipairs(registered_sections) do
+			if sname == name then return true end
+		end
+		return false
+	end
+	assert(test(),
+		"Make sure the section is registered using register_section!"
+	)
+	api.sections[name] = {}
+end
+-- deprecated way to get sections
+function api.section_tables()
+	return api.sections
+end
+
+function api.add_machine_to_shop(id)
+	api.shop_machines[#api.shop_machines+1]= id
 end

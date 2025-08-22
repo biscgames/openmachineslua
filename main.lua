@@ -1,4 +1,13 @@
 local soundq = require "modules.soundq"
+require "src.api"
+require "src.modsystem"
+api.register_machine("default:switch",{
+	name = "Switch",
+	img_m = "switch_machine.png",
+	type = "switch",
+	switch_on = false
+})
+api.add_machine_to_shop("default:switch")
 
 local background_color = {0.302,0.506,0.741}
 local section_background_color = {0.14,0.14,0.14}
@@ -12,7 +21,7 @@ local section_btn_spacing = 8
 
 local images = {}
 local audio = {}
-for _,folder in ipairs({"icons","machines","states","items"}) do
+for _,folder in ipairs(image_directories) do
 	for _,fname in ipairs(love.filesystem.getDirectoryItems(folder)) do
 		local dir = folder.."/"..fname
 		images[fname] = love.graphics.newImage(dir)
@@ -25,16 +34,13 @@ for _,fname in ipairs(love.filesystem.getDirectoryItems("sounds")) do
 end
 
 local section = "machines"
-local section_buttons = {
-	"new_machine",
-	"machines",
-	"settings",
-	"inventory"
-}
+
+api.register_section "new_machine"
+api.register_section "machines"
+api.register_section "inventory"
+api.register_section "settings"
+
 local sections = {}
-for _,s in ipairs(section_buttons) do
-	sections[s] = {}
-end
 
 local machines_grid = {}
 for r=1,6 do
@@ -44,85 +50,28 @@ for r=1,6 do
 	end
 	machines_grid[r] = row
 end
-math.randomseed(os.time())
-for t=1,3 do
-	for _=1,3 do math.random() end
-	local r = math.random(2,#machines_grid-1)
-	local c = math.random(2,#machines_grid[r]-1)
-	machines_grid[r][c] = {
-		name = "Normal Deposit",
-		type = "deposit",
-		img_m = "deposit.png"
-	}
-end
-local deposit_items = {
-	{name="Iron",stack=4,image="iron.png"},
-	{name="Gold",stack=2,image="gold.png"},
-	{name="Etherium",stack=1,image="eth.png"}
-}
 
 local selected = {x=0,y=0}
-local inventory = {}
+local inventory = api.inv_system:new({items={},can_fit=9})
 
 local stack_limit = 128
-
-inventory.__index = inventory
-inventory.can_fit = 9
-inventory.items = {}
-function inventory:find(func)
-	for i,item in ipairs(self.items) do
-		if func(item,i) then return i,item end
-	end
-	return nil,nil
-end
-function inventory:add_item(item,stack)
-	local image
-	local itemname
-	if type(item) == "table" then
-		image = item.image
-		stack = item.stack
-		itemname = item.name
-	else
-		itemname = item
-	end
-	stack = tonumber(stack) or 0
-	local i,existing = self:find(function(test) return test.name == itemname and test.stack < stack_limit end)
-	if not existing then
-		if #self.items>=self.can_fit then return end
-		self.items[#self.items+1] = {
-			name = itemname,
-			stack = stack,
-			image = image
-		}
-		return
-	end
-	local add_by = self.items[i].stack+stack
-	self.items[i].stack = math.min(stack_limit,add_by)
-	if self.items[i].stack+stack > stack_limit then
-		if math.abs(stack_limit-add_by)<1 then return end
-		self.items[#self.items+1] = {
-			name = itemname,
-			stack = math.abs(stack_limit-add_by),
-			image = image
-		}
-	end
-
-end
-function inventory:remove_item(idx)
-	table.remove(self.items,idx)
-end
-function inventory.new(can_fit)
-	return setmetatable({items={},can_fit=can_fit},inventory)
-end
-
 local font = love.graphics.newFont("fonts/font.ttf",24)
 
+for _,s in ipairs(api.get_registered_sections()) do
+	sections[s] = api.section_tables()[s] or {}
+end
 function love.load() 
 	love.graphics.setFont(font)
 	local bgm = love.audio.newSource("bgm/Hypnothis.mp3","stream")
 	bgm:setVolume(0.25)
 	bgm:setLooping(true)
 	bgm:play()
+	for _,mod in ipairs(loaded_mods) do
+		mod()(machines_grid,api)
+	end
+	for _,s in ipairs(api.get_registered_sections()) do
+		if api.sections[s] then sections[s] = api.sections[s] end
+	end
 end
 function love.mousepressed(mx,my,button)
 	if sections[section] then
@@ -131,6 +80,7 @@ function love.mousepressed(mx,my,button)
 		end
 	end
 	if my > toolbar_y+toolbar_height or button ~= 1 then return end
+	local section_buttons = api.get_registered_sections()
 	for i=1,#section_buttons do
 		local btn = section_buttons[i]
 		local img = images[btn..".png"] or images["nil.png"]
@@ -165,6 +115,7 @@ function love.draw()
 		love.graphics.getWidth(),toolbar_height
 	)
 	if not selection_mode then
+		local section_buttons = api.get_registered_sections()
 		for i=1,#section_buttons do
 			local btn = section_buttons[i]
 			local img = images[btn..".png"] or images["nil.png"]
@@ -295,7 +246,7 @@ function sections.machines:draw()
 	if self.machine_hover.extract then
 		rectw = 400
 	elseif self.machine_hover.type == "storage" then
-		rectw = (self.machine_hover.storage.can_fit*(images[deposit_items[1].image]:getWidth()*theme.scale_factor))+16
+		rectw = (self.machine_hover.storage.can_fit*(128*theme.scale_factor))+16
 	else
 		rectw = 200
 	end
@@ -394,29 +345,9 @@ function sections.machines:update(dt)
 		end
 		machine.has_storage = machine_right ~= 'e"' and machine_right.type == "storage"
 
-		if machine.pwr_on then
-			if machine.extract and machine.has_storage then
-				if grid_above ~= 'e"' and grid_above.type == "deposit" then
-					machine.touching_deposit = true
-					machine_right.storage:add_item(deposit_items[math.random(1,#deposit_items)])
-					--machine_right.storage:add_item({
-					--	name = "Testificate",
-					--	stack = 1,
-					--	image = "testificate.png"
-					--})
-				end
-				if grid_below ~= 'e"' and grid_below.type == "deposit" and machine.extract_below then
-					machine.touching_deposit = true
-					machine_right.storage:add_item(deposit_items[math.random(1,#deposit_items)])
-					--machine_right.storage:add_item({
-					--	name = "Testificate",
-					--	stack = 1,
-					--	image = "testificate.png"
-					--})
-				end
-				if (grid_below == 'e"' or grid_below.type ~= "deposit") or (grid_above == 'e"' or not grid_above.type ~= "deposit") then
-					machine.touching_deposit = false
-				end
+		if machine.on_update then
+			if machine.pwr_on or machine.type ~= "machine" then
+				machine:on_update(machines_grid,r,c)
 			end
 		end
 	end
@@ -503,7 +434,7 @@ function sections.machines:mousereleased(mx,my,button)
 						end
 					end
 				else
-					machines_grid[r][c] = 'e"'
+					if machines_grid[r][c].type ~= "deposit" then machines_grid[r][c] = 'e"' end
 				end
 			end
 		end
@@ -526,16 +457,11 @@ sections.new_machine.theme.button_background_color = toolbar_background_color
 sections.new_machine.theme.button_image_x = 16
 sections.new_machine.theme.machine_image_scale_factor = 0.35
 
-sections.new_machine.machines = {
-	{name="Switch",type="switch",img_m="switch_machine.png",switch_on=false},
-	{name="Extractor",type="machine",img_m="extractor.png",extract=3,pwr_on=false,has_storage=false,extract_below=false},
-	{name="Advanced Extractor",type="machine",img_m="advanced_extractor.png",extract=3,pwr_on=false,has_storage=false,extract_below=true},
-	{name="Simple Storage",type="storage",img_m="simple_storage.png",can_fit=1,storage={}},
-	{name="Storage",type="storage",img_m="storage_machine.png",can_fit=3,storage={}},
-}
+sections.new_machine.machines = api.shop_machines
 function sections.new_machine:draw()
 	local theme = self.theme
-	for i,machine in ipairs(self.machines) do
+	for i,m in ipairs(self.machines) do
+		local machine = api.get_registered("machine")[m]
 		if self.select_idx == i then
 			love.graphics.setColor(selected_icon_background_color)
 		else
@@ -610,10 +536,7 @@ function sections.new_machine:mousereleased(mx,my)
 		end
 		for i,machine in ipairs(self.machines) do
 			if self.select_idx==i then
-				machines_grid[selected.y][selected.x] = clone_table(machine)
-				if machines_grid[selected.y][selected.x].storage then
-					machines_grid[selected.y][selected.x].storage = inventory.new(machine.can_fit)
-				end
+				api.place("machine",machines_grid,machine,{r=selected.y,c=selected.x})
 				break
 			end
 		end
