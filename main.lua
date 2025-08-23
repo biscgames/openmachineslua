@@ -72,6 +72,11 @@ function love.load()
 	for _,s in ipairs(api.get_registered_sections()) do
 		if api.sections[s] then sections[s] = api.sections[s] end
 	end
+
+	api.images = images
+	api.audio = audio
+	api.toolbar_y = toolbar_y
+	api.toolbar_height = toolbar_height
 end
 function love.mousepressed(mx,my,button)
 	if sections[section] then

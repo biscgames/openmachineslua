@@ -223,3 +223,4 @@ end
 function api.add_machine_to_shop(id)
 	api.shop_machines[#api.shop_machines+1]= id
 end
+
