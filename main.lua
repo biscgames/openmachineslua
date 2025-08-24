@@ -52,7 +52,7 @@ for r=1,6 do
 end
 
 local selected = {x=0,y=0}
-local inventory = api.inv_system:new({items={},can_fit=9})
+local inventory = api.inv_system:new({items={},can_fit=24})
 
 local stack_limit = 128
 local font = love.graphics.newFont("fonts/font.ttf",24)
@@ -430,8 +430,9 @@ function sections.machines:mousereleased(mx,my,button)
 						elseif tile.type == "storage" then
 							while #tile.storage.items > 0 do
 								local item = tile.storage.items[1]
-								inventory:add_item(item)
-								table.remove(tile.storage.items,1)
+								if inventory:add_item(item) then table.remove(tile.storage.items,1) else
+									break
+								end
 							end
 						end
 						if audio[tile.type..".wav"] then
@@ -563,17 +564,21 @@ end
 sections.inventory.scale_factor = 0.75
 function sections.inventory:draw()
 	local relative = toolbar_y+toolbar_height
+	local j = 0
 	for i,item in ipairs(inventory.items) do
+		local j = math.floor((i-1)/8)
+		local x = ((i-1)%8)*(images[item.image]:getWidth()*self.scale_factor)
+		local y = relative+(j*(images[item.image]:getHeight()*self.scale_factor))
 		love.graphics.draw(
 			images[item.image],
-			(i-1)*(images[item.image]:getWidth()*self.scale_factor),
-			relative,
+			x,
+			y,
 			0,self.scale_factor
 		)
 		love.graphics.print(
 			item.stack,
-			(i-1)*(images[item.image]:getWidth()*self.scale_factor)+25,
-			relative+25
+			x,
+			y
 		)
 	end
 end

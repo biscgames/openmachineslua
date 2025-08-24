@@ -28,8 +28,11 @@ end
 	the inventory:add_item(item_definition) method is used to add items to the inventory.items table.
 	this method handles any stacks going above the stack limit, unlike manually adding it yourself
 	unless your method fully calculates with stack_limit
+
+	it returns true if it has succesfully completed, otherwise return false
 ]]
 function api.inv_system:add_item(item_definition)
+	if #self.items>=self.can_fit then return false end
 	local i,existing = self:find(function(item)
 		return item.name==item_definition.name and item.stack<self.stack_limit 
 	end)
@@ -57,6 +60,7 @@ function api.inv_system:add_item(item_definition)
 	else
 		_add_item()
 	end
+	return true
 end
 --[[
 	the inventory:remove_item(index|name) method is used to remove items. If a string value was passed
@@ -187,6 +191,7 @@ function api.place(type_,grid,machine_id,rc_table,c)
 		t = api.dpcopy(registered_deposits[machine_id])
 	end
 	grid[r][c] = t
+	if grid[r][c].on_place then grid[r][c]:on_place(grid,r,c) end
 
 end
 
